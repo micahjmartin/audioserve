@@ -4,6 +4,8 @@ BUILD_DIR="_static_build"
 TARGET=x86_64-unknown-linux-musl
 export HOME=/root
 
+RUSTFLAGS=$RUSTFLAGS" -l static=clang -l static=icui18n -L native=/usr/lib"
+
 cargo build --target $TARGET --release ${CARGO_ARGS} --features static,${FEATURES}
 cd client
 npm install
