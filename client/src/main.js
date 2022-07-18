@@ -13,6 +13,8 @@ import config from "./config";
 
 $(function () {
     const RECENT_QUERY = "__RECENT__";
+    const TITLE = "AudioServe"
+    document.title = TITLE;
     var baseUrl;
     if (AUDIOSERVE_DEVELOPMENT) {
         baseUrl = `${window.location.protocol}//${window.location.hostname}:${config.DEVELOPMENT_PORT}`;
@@ -76,9 +78,20 @@ $(function () {
 
     function loadCollections() {
         return ajax({ url: baseUrl + "/collections" })
-            .then(data => {
+            .then((data, x, xhr) => {
                 debug("Collections", data);
                 console.log("Connected to audioserve version " + data.version);
+
+                // Set the group prefix as the specified user if its not otherwise specified
+                let group = window.localStorage.getItem("audioserve_group");
+                if (!group) {
+                    // If the group was set from a server header (e.g. a proxy) use that
+                    group = xhr.getResponseHeader("X-Audioserve-group")
+                    if (group) {
+                        window.localStorage.setItem("audioserve_group", group);
+                    }
+                }
+
                 collections = data.names;
                 console.assert(data.names.length > 0);
                 console.assert(collections.length == data.count, "Invalid collections response - count does not fit");
@@ -554,6 +567,9 @@ $(function () {
         const trans = target.data("transcoded");
         const transcoded = trans && trans != '0';
         const duration = target.data("duration");
+
+        // Update the title to include file name on initial play
+        document.title = target[0].firstChild.data + " - " + TITLE;
         let fullUrl = collectionUrl + "/audio/" + path + `?trans=${trans}`;
 
 
@@ -606,6 +622,9 @@ $(function () {
         player.pause();
         player.setUrl("");
         $("#files a").removeClass("active");
+
+        // Set the title back to the original whenever play is stopped
+        document.title = TITLE;
     }
 
     function showInView(nextTarget) {
@@ -727,8 +746,8 @@ $(function () {
         const group = window.localStorage.getItem("audioserve_group");
         if (group) sync.groupPrefix = `${group}/${collIndex}/`;
         window.localStorage.setItem("audioserve_collection", collIndex);
-
-
+    
+    
     }
 
     function currentCollection() {
