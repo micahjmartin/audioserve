@@ -48,6 +48,7 @@ mod subs;
 pub mod transcode;
 mod types;
 
+
 type Counter = Arc<AtomicUsize>;
 
 #[derive(Debug)]
@@ -318,6 +319,23 @@ fn get_subpath(path: &str, prefix: &str) -> PathBuf {
     Path::new(&path).strip_prefix(prefix).unwrap().to_path_buf()
 }
 
+/* Forward any headers starting with "x-audioserve-" to the client, this allows the client to 
+get the group sync key from X-AudioServe-group or any other headers that clients may want */
+#[cfg(feature = "behind-proxy")]
+fn add_headers(
+    headers: hyper::HeaderMap,
+    mut resp: Response<Body>,
+    origin: Option<Origin>,
+    enabled: bool,
+) -> Response<Body> {
+    for (header, value) in headers.iter() {
+        if header.as_str().starts_with("x-audioserve-") {
+            assert!(resp.headers_mut().insert(header, value.clone()).is_none());
+        }
+    }
+    add_cors_headers(resp, origin, enabled)
+}
+
 fn add_cors_headers(
     mut resp: Response<Body>,
     origin: Option<Origin>,
@@ -448,6 +466,7 @@ impl<C: 'static> FileSendService<C> {
         let transcoding = self.transcoding.clone();
         let cors = get_config().is_cors_enabled(&req.request);
         let origin = req.headers().typed_get::<Origin>();
+        let headers = req.headers().clone();
 
         let resp = match self.authenticator {
             Some(ref auth) => {
@@ -473,7 +492,12 @@ impl<C: 'static> FileSendService<C> {
                 self.collections.clone(),
             ),
         };
-        Box::pin(resp.map_ok(move |r| add_cors_headers(r, origin, cors)))
+
+        if cfg!(feature = "behind-proxy") {
+            Box::pin(resp.map_ok(move |r| add_headers(headers, r, origin, cors)))
+        } else {
+            Box::pin(resp.map_ok(move |r| add_cors_headers(r, origin, cors)))
+        }
     }
 
     fn process_checked(
