@@ -315,7 +315,7 @@ $(function () {
                 }
                 if (data.files.length) {
                     $("#files-container").show();
-                    $("#folder-download-link").attr("href", collectionUrl + "/download/" + path);
+                    $("#folder-download-link").attr("href", collectionUrl + "/download/" + path +".zip");
                 } else {
                     $("#files-container").hide();
                 }
